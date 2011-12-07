@@ -1,0 +1,299 @@
+From d4eef9303d28565dcfdcde63becf6d610594bce8 Mon Sep 17 00:00:00 2001
+From: Bastien Nocera <hadess@hadess.net>
+Date: Wed, 9 Dec 2009 13:15:57 +0000
+Subject: [PATCH] Remove all use of g_error()
+
+Otherwise we get bug reports about crashers that aren't crashers.
+---
+ tests/delete.c |   26 +++++++++++++++++---------
+ tests/enroll.c |   36 ++++++++++++++++++++++++------------
+ tests/list.c   |   26 +++++++++++++++++---------
+ tests/verify.c |   42 ++++++++++++++++++++++++++++--------------
+ 4 files changed, 86 insertions(+), 44 deletions(-)
+
+diff --git a/tests/delete.c b/tests/delete.c
+index b6e58de..38dccfb 100644
+--- a/tests/delete.c
++++ b/tests/delete.c
+@@ -31,8 +31,10 @@ static void create_manager(void)
+ 	GError *error = NULL;
+ 
+ 	connection = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
+-	if (connection == NULL)
+-		g_error("Failed to connect to session bus: %s", error->message);
++	if (connection == NULL) {
++		g_print("Failed to connect to session bus: %s\n", error->message);
++		exit (1);
++	}
+ 
+ 	manager = dbus_g_proxy_new_for_name(connection,
+ 		"net.reactivated.Fprint", "/net/reactivated/Fprint/Manager",
+@@ -47,14 +49,18 @@ static void delete_fingerprints(DBusGProxy *dev, const char *username)
+ 
+ 	p = dbus_g_proxy_new_from_proxy(dev, "org.freedesktop.DBus.Properties", NULL);
+ 	if (!dbus_g_proxy_call (p, "GetAll", &error, G_TYPE_STRING, "net.reactivated.Fprint.Device", G_TYPE_INVALID,
+-			   dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_VALUE), &props, G_TYPE_INVALID))
+-		g_error("GetAll on the Properties interface failed: %s", error->message);
++			   dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_VALUE), &props, G_TYPE_INVALID)) {
++		g_print("GetAll on the Properties interface failed: %s\n", error->message);
++		exit (1);
++	}
+ 
+ 	if (!net_reactivated_Fprint_Device_delete_enrolled_fingers(dev, username, &error)) {
+-		if (dbus_g_error_has_name (error, "net.reactivated.Fprint.Error.NoEnrolledPrints") == FALSE)
+-			g_error("ListEnrolledFingers failed: %s", error->message);
+-		else
++		if (dbus_g_error_has_name (error, "net.reactivated.Fprint.Error.NoEnrolledPrints") == FALSE) {
++			g_print("ListEnrolledFingers failed: %s\n", error->message);
++			exit (1);
++		} else {
+ 			g_print ("No fingerprints to delete on %s\n", g_value_get_string (g_hash_table_lookup (props, "name")));
++		}
+ 	} else {
+ 			g_print ("Fingerprints deleted on %s\n", g_value_get_string (g_hash_table_lookup (props, "name")));
+ 	}
+@@ -69,8 +75,10 @@ static void process_devices(char **argv)
+ 	char *path;
+ 	guint i;
+ 
+-	if (!net_reactivated_Fprint_Manager_get_devices(manager, &devices, &error))
+-		g_error("list_devices failed: %s", error->message);
++	if (!net_reactivated_Fprint_Manager_get_devices(manager, &devices, &error)) {
++		g_print("list_devices failed: %s\n", error->message);
++		exit (1);
++	}
+ 	
+ 	if (devices->len == 0) {
+ 		g_print("No devices found\n");
+diff --git a/tests/enroll.c b/tests/enroll.c
+index e7da3b3..260fb17 100644
+--- a/tests/enroll.c
++++ b/tests/enroll.c
+@@ -31,8 +31,10 @@ static void create_manager(void)
+ 	GError *error = NULL;
+ 
+ 	connection = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
+-	if (connection == NULL)
+-		g_error("Failed to connect to session bus: %s", error->message);
++	if (connection == NULL) {
++		g_print("Failed to connect to session bus: %s\n", error->message);
++		exit (1);
++	}
+ 
+ 	manager = dbus_g_proxy_new_for_name(connection,
+ 		"net.reactivated.Fprint", "/net/reactivated/Fprint/Manager",
+@@ -45,8 +47,10 @@ static DBusGProxy *open_device(const char *username)
+ 	gchar *path;
+ 	DBusGProxy *dev;
+ 
+-	if (!net_reactivated_Fprint_Manager_get_default_device(manager, &path, &error))
+-		g_error("list_devices failed: %s", error->message);
++	if (!net_reactivated_Fprint_Manager_get_default_device(manager, &path, &error)) {
++		g_print("list_devices failed: %s\n", error->message);
++		exit (1);
++	}
+ 	
+ 	if (path == NULL) {
+ 		g_print("No devices found\n");
+@@ -61,8 +65,10 @@ static DBusGProxy *open_device(const char *username)
+ 
+ 	g_free (path);
+ 
+-	if (!net_reactivated_Fprint_Device_claim(dev, username, &error))
+-		g_error("failed to claim device: %s", error->message);
++	if (!net_reactivated_Fprint_Device_claim(dev, username, &error)) {
++		g_print("failed to claim device: %s\n", error->message);
++		exit (1);
++	}
+ 	return dev;
+ }
+ 
+@@ -84,8 +90,10 @@ static void do_enroll(DBusGProxy *dev)
+ 				    &enroll_completed, NULL);
+ 
+ 	g_print("Enrolling right index finger.\n");
+-	if (!net_reactivated_Fprint_Device_enroll_start(dev, "right-index-finger", &error))
+-		g_error("EnrollStart failed: %s", error->message);
++	if (!net_reactivated_Fprint_Device_enroll_start(dev, "right-index-finger", &error)) {
++		g_print("EnrollStart failed: %s\n", error->message);
++		exit (1);
++	}
+ 
+ 	while (!enroll_completed)
+ 		g_main_context_iteration(NULL, TRUE);
+@@ -93,15 +101,19 @@ static void do_enroll(DBusGProxy *dev)
+ 	dbus_g_proxy_disconnect_signal(dev, "EnrollStatus",
+ 		G_CALLBACK(enroll_result), &enroll_completed);
+ 
+-	if (!net_reactivated_Fprint_Device_enroll_stop(dev, &error))
+-		g_error("VerifyStop failed: %s", error->message);
++	if (!net_reactivated_Fprint_Device_enroll_stop(dev, &error)) {
++		g_print("VerifyStop failed: %s\n", error->message);
++		exit(1);
++	}
+ }
+ 
+ static void release_device(DBusGProxy *dev)
+ {
+ 	GError *error = NULL;
+-	if (!net_reactivated_Fprint_Device_release(dev, &error))
+-		g_error("ReleaseDevice failed: %s", error->message);
++	if (!net_reactivated_Fprint_Device_release(dev, &error)) {
++		g_print("ReleaseDevice failed: %s\n", error->message);
++		exit (1);
++	}
+ }
+ 
+ int main(int argc, char **argv)
+diff --git a/tests/list.c b/tests/list.c
+index 561b05a..074457e 100644
+--- a/tests/list.c
++++ b/tests/list.c
+@@ -31,8 +31,10 @@ static void create_manager(void)
+ 	GError *error = NULL;
+ 
+ 	connection = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
+-	if (connection == NULL)
+-		g_error("Failed to connect to session bus: %s", error->message);
++	if (connection == NULL) {
++		g_print("Failed to connect to session bus: %s\n", error->message);
++		exit (1);
++	}
+ 
+ 	manager = dbus_g_proxy_new_for_name(connection,
+ 		"net.reactivated.Fprint", "/net/reactivated/Fprint/Manager",
+@@ -48,16 +50,20 @@ static void list_fingerprints(DBusGProxy *dev, const char *username)
+ 	guint i;
+ 
+ 	if (!net_reactivated_Fprint_Device_list_enrolled_fingers(dev, username, &fingers, &error)) {
+-		if (dbus_g_error_has_name (error, "net.reactivated.Fprint.Error.NoEnrolledPrints") == FALSE)
+-			g_error("ListEnrolledFingers failed: %s", error->message);
+-		else
++		if (dbus_g_error_has_name (error, "net.reactivated.Fprint.Error.NoEnrolledPrints") == FALSE) {
++			g_print("ListEnrolledFingers failed: %s\n", error->message);
++			exit (1);
++		} else {
+ 			fingers = NULL;
++		}
+ 	}
+ 
+ 	p = dbus_g_proxy_new_from_proxy(dev, "org.freedesktop.DBus.Properties", NULL);
+ 	if (!dbus_g_proxy_call (p, "GetAll", &error, G_TYPE_STRING, "net.reactivated.Fprint.Device", G_TYPE_INVALID,
+-			   dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_VALUE), &props, G_TYPE_INVALID))
+-		g_error("GetAll on the Properties interface failed: %s", error->message);
++			   dbus_g_type_get_map ("GHashTable", G_TYPE_STRING, G_TYPE_VALUE), &props, G_TYPE_INVALID)) {
++		g_print("GetAll on the Properties interface failed: %s\n", error->message);
++		exit (1);
++	}
+ 
+ 	if (fingers == NULL || g_strv_length (fingers) == 0) {
+ 		g_print("User %s has no fingers enrolled for %s.\n", username, g_value_get_string (g_hash_table_lookup (props, "name")));
+@@ -85,8 +91,10 @@ static void process_devices(char **argv)
+ 	char *path;
+ 	guint i;
+ 
+-	if (!net_reactivated_Fprint_Manager_get_devices(manager, &devices, &error))
+-		g_error("list_devices failed: %s", error->message);
++	if (!net_reactivated_Fprint_Manager_get_devices(manager, &devices, &error)) {
++		g_print("list_devices failed: %s\n", error->message);
++		exit (1);
++	}
+ 	
+ 	if (devices->len == 0) {
+ 		g_print("No devices found\n");
+diff --git a/tests/verify.c b/tests/verify.c
+index eb739cb..69be220 100644
+--- a/tests/verify.c
++++ b/tests/verify.c
+@@ -36,8 +36,10 @@ static void create_manager(void)
+ 	GError *error = NULL;
+ 
+ 	connection = dbus_g_bus_get(DBUS_BUS_SYSTEM, &error);
+-	if (connection == NULL)
+-		g_error("Failed to connect to session bus: %s", error->message);
++	if (connection == NULL) {
++		g_print("Failed to connect to session bus: %s\n", error->message);
++		exit (1);
++	}
+ 
+ 	manager = dbus_g_proxy_new_for_name(connection,
+ 		"net.reactivated.Fprint", "/net/reactivated/Fprint/Manager",
+@@ -50,8 +52,10 @@ static DBusGProxy *open_device(const char *username)
+ 	gchar *path;
+ 	DBusGProxy *dev;
+ 
+-	if (!net_reactivated_Fprint_Manager_get_default_device(manager, &path, &error))
+-		g_error("list_devices failed: %s", error->message);
++	if (!net_reactivated_Fprint_Manager_get_default_device(manager, &path, &error)) {
++		g_print("list_devices failed: %s\n", error->message);
++		exit (1);
++	}
+ 	
+ 	if (path == NULL) {
+ 		g_print("No devices found\n");
+@@ -66,8 +70,10 @@ static DBusGProxy *open_device(const char *username)
+ 	
+ 	g_free (path);
+ 
+-	if (!net_reactivated_Fprint_Device_claim(dev, username, &error))
+-		g_error("failed to claim device: %s", error->message);
++	if (!net_reactivated_Fprint_Device_claim(dev, username, &error)) {
++		g_print("failed to claim device: %s\n", error->message);
++		exit (1);
++	}
+ 
+ 	return dev;
+ }
+@@ -78,8 +84,10 @@ static void find_finger(DBusGProxy *dev, const char *username)
+ 	char **fingers;
+ 	guint i;
+ 
+-	if (!net_reactivated_Fprint_Device_list_enrolled_fingers(dev, username, &fingers, &error))
+-		g_error("ListEnrolledFingers failed: %s", error->message);
++	if (!net_reactivated_Fprint_Device_list_enrolled_fingers(dev, username, &fingers, &error)) {
++		g_print("ListEnrolledFingers failed: %s\n", error->message);
++		exit (1);
++	}
+ 
+ 	if (fingers == NULL || g_strv_length (fingers) == 0) {
+ 		g_print("No fingers enrolled for this device.\n");
+@@ -122,8 +130,10 @@ static void do_verify(DBusGProxy *dev)
+ 	dbus_g_proxy_connect_signal(dev, "VerifyFingerSelected", G_CALLBACK(verify_finger_selected),
+ 		NULL, NULL);
+ 
+-	if (!net_reactivated_Fprint_Device_verify_start(dev, finger_name, &error))
+-		g_error("VerifyStart failed: %s", error->message);
++	if (!net_reactivated_Fprint_Device_verify_start(dev, finger_name, &error)) {
++		g_print("VerifyStart failed: %s\n", error->message);
++		exit (1);
++	}
+ 
+ 	while (!verify_completed)
+ 		g_main_context_iteration(NULL, TRUE);
+@@ -131,15 +141,19 @@ static void do_verify(DBusGProxy *dev)
+ 	dbus_g_proxy_disconnect_signal(dev, "VerifyStatus", G_CALLBACK(verify_result), &verify_completed);
+ 	dbus_g_proxy_disconnect_signal(dev, "VerifyFingerSelected", G_CALLBACK(verify_finger_selected), NULL);
+ 
+-	if (!net_reactivated_Fprint_Device_verify_stop(dev, &error))
+-		g_error("VerifyStop failed: %s", error->message);
++	if (!net_reactivated_Fprint_Device_verify_stop(dev, &error)) {
++		g_print("VerifyStop failed: %s\n", error->message);
++		exit (1);
++	}
+ }
+ 
+ static void release_device(DBusGProxy *dev)
+ {
+ 	GError *error = NULL;
+-	if (!net_reactivated_Fprint_Device_release(dev, &error))
+-		g_error("ReleaseDevice failed: %s", error->message);
++	if (!net_reactivated_Fprint_Device_release(dev, &error)) {
++		g_print("ReleaseDevice failed: %s\n", error->message);
++		exit (1);
++	}
+ }
+ 
+ static const GOptionEntry entries[] = {
+-- 
+1.6.5.2
+

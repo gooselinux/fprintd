@@ -1,0 +1,33 @@
+diff -up fprintd-0.1/pam/pam_fprintd.c.dont-call-g-source-remove fprintd-0.1/pam/pam_fprintd.c
+--- fprintd-0.1/pam/pam_fprintd.c.dont-call-g-source-remove	2010-07-27 15:05:40.438038286 -0700
++++ fprintd-0.1/pam/pam_fprintd.c	2010-07-27 15:06:45.220024621 -0700
+@@ -298,11 +298,10 @@ static int do_verify(GMainLoop *loop, pa
+ 
+ 	while (ret == PAM_AUTH_ERR && data->max_tries > 0) {
+ 		GSource *source;
+-		guint timeout_id;
+ 
+ 		/* Set up the timeout on our non-default context */
+ 		source = g_timeout_source_new_seconds (TIMEOUT);
+-		timeout_id = g_source_attach (source, g_main_loop_get_context (loop));
++		g_source_attach (source, g_main_loop_get_context (loop));
+ 		g_source_set_callback (source, verify_timeout_cb, data, NULL);
+ 
+ 		data->timed_out = FALSE;
+@@ -311,14 +310,14 @@ static int do_verify(GMainLoop *loop, pa
+ 			D(pamh, "VerifyStart failed: %s", error->message);
+ 			g_error_free (error);
+ 
+-			g_source_remove (timeout_id);
++			g_source_destroy (source);
+ 			g_source_unref (source);
+ 			break;
+ 		}
+ 
+ 		g_main_loop_run (loop);
+ 
+-		g_source_remove (timeout_id);
++		g_source_destroy (source);
+ 		g_source_unref (source);
+ 
+ 		/* Ignore errors from VerifyStop */
